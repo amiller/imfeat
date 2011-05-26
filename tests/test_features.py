@@ -8,9 +8,9 @@ import scipy.io
 
 
 class TestFeatures(unittest.TestCase):
-    
+
     def setUp(self):
-        self.image_names = ['test_images/test1.jpg', 
+        self.image_names = ['test_images/test1.jpg',
                             'test_images/test2.jpg']
 
     def _histogram(self, hf):
@@ -32,7 +32,7 @@ class TestFeatures(unittest.TestCase):
 
     def test_histogram_joint(self):
         self._histogram(imfeat.Histogram('rgb'))
-  
+
     def test_histogram_joint_lab(self):
         self._histogram(imfeat.Histogram('lab'))
 
@@ -40,12 +40,14 @@ class TestFeatures(unittest.TestCase):
         feature = imfeat.Moments('rgb', 2)
         for feat_out, image in self._run_all_images(feature):
             image = np.asfarray(image) / 255.
-            image = image.reshape((image.shape[0] * image.shape[1], image.shape[2]))
+            image = image.reshape((image.shape[0] * image.shape[1],
+                                   image.shape[2]))
             np.testing.assert_almost_equal(np.mean(image, 0), feat_out[0][:3])
             print(np.var(image, 0), feat_out[0][3:6])
             np.testing.assert_almost_equal(np.var(image, 0), feat_out[0][3:6])
 
     def test_rhog_gray(self):
+        print('RHOG_GRAY')
         feature = imfeat.RHOG()
         for feat_out, image in self._run_all_images(feature):
             print(feat_out)
@@ -70,7 +72,6 @@ class TestFeatures(unittest.TestCase):
             print(len(feat_out[0]))
 
     def test_hog_latent(self):
-        print('Hog Latent')
         feature = imfeat.HOGLatent(2)
         for feat_out, image in self._run_all_images(feature):
             print(feat_out)
@@ -79,9 +80,11 @@ class TestFeatures(unittest.TestCase):
         image = Image.open('test_images/lena.ppm')
         out = imfeat.compute(feature, image)[0]
         self.assertEqual(len(out), 254 * 254 * 32)
-        np.testing.assert_equal(hashlib.md5(out).hexdigest(), '18231ad8c359860ee09e8f0fa8b316a1')
+        np.testing.assert_equal(hashlib.md5(out).hexdigest(),
+                                '18231ad8c359860ee09e8f0fa8b316a1')
 
     def test_gist(self):
+        print 'GIST'
         feature = imfeat.GIST()
         for feat_out, image in self._run_all_images(feature):
             print(feat_out)
@@ -95,6 +98,11 @@ class TestFeatures(unittest.TestCase):
         self.assertEqual(len(true_string.split()), len(test_string.split()))
         self.assertEqual(true_string, test_string)
 
-            
+    def test_gist_large(self):
+        feature = imfeat.GIST()
+        image = Image.open('test_images/large.jpg')
+        out = imfeat.compute(feature, image)[0]
+
+
 if __name__ == '__main__':
     unittest.main()
