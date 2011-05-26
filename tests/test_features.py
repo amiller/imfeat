@@ -5,6 +5,7 @@ import hashlib
 import numpy as np
 import scipy as sp
 import scipy.io
+import cv
 
 
 class TestFeatures(unittest.TestCase):
@@ -87,8 +88,9 @@ class TestFeatures(unittest.TestCase):
         print 'GIST'
         feature = imfeat.GIST()
         for feat_out, image in self._run_all_images(feature):
-            print(feat_out)
-            print(len(feat_out[0]))
+            #print(feat_out)
+            #print(len(feat_out[0]))
+            pass
         # Compare against known output
         image = Image.open('test_images/lena.ppm')
         out = imfeat.compute(feature, image)[0]
@@ -98,11 +100,26 @@ class TestFeatures(unittest.TestCase):
         self.assertEqual(len(true_string.split()), len(test_string.split()))
         self.assertEqual(true_string, test_string)
 
-    def test_gist_large(self):
-        feature = imfeat.GIST()
-        image = Image.open('test_images/large.jpg')
+    def _test_feature(self, name, feature):
+        image = Image.open(name)
         out = imfeat.compute(feature, image)[0]
+        return out
 
+    def test_moments_large(self):
+        self._test_feature('test_images/large.jpg', imfeat.Moments('rgb', 2))
+
+    @unittest.skip("GIST large segfaults")
+    def test_gist_large(self):
+        self._test_feature('test_images/large.jpg', imfeat.GIST())
+
+    def test_hog_large(self):
+        self._test_feature('test_images/large.jpg', imfeat.HOGLatent(2))
+
+    def test_gist_small(self):
+        image = cv.LoadImage('test_images/small.png')
+        feature = imfeat.GIST()
+        out = imfeat.compute(feature, image)[0]
+        return out
 
 if __name__ == '__main__':
     unittest.main()
