@@ -22,6 +22,7 @@ __license__ = 'GPL V3'
 
 import Image
 import cv
+import warnings
 
 
 def _convert_color(image, code, depth, channels):
@@ -72,7 +73,7 @@ def _convert_depth(image, depth):
             image_f = cv.CreateImage(cv.GetSize(image), depth, image.channels)
             cv.CvtScale(image, image_f, 1 / 255.)
             image = image_f
-    elif depth == cv.IPL_DEPTH_8U:
+    elif depth == cv.IPL_DEPTH_8U:  # TODO Test to see if these conversions are correct
         if image.depth == cv.IPL_DEPTH_32F:
             image_f = cv.CreateImage(cv.GetSize(image), depth, image.channels)
             cv.CvtScale(image, image_f, 255.)
@@ -133,13 +134,16 @@ def _convert_cv_rgb(image, mode, depth):
 
 
 def _convert_pil(image, mode):
+    if image.mode == 'RGBA':
+        image = image.convert('RGB')
     if image.mode == 'L':
         if not isinstance(mode, str):
             if mode == ('opencv', 'gray', cv.IPL_DEPTH_8U):
                 cv_im = cv.CreateImageHeader(image.size, cv.IPL_DEPTH_8U, 1)
                 cv.SetData(cv_im, image.tostring())
                 return cv_im
-        raise ValueError('Image must not be gray')
+        # At this point it must be that we want a color image
+        image = image.convert('RGB')
     if isinstance(mode, str):  # TO PIL
         return image.convert(mode)
     elif mode[0] == 'opencv':
@@ -155,7 +159,11 @@ def _convert_cv(image, mode):
         if isinstance(mode, str) and mode == 'L':  # TO PIL
             return Image.fromstring("L", cv.GetSize(image),
                                     image.tostring())
-        raise ValueError('Image must not be gray')
+        # At this point it must be that we want a color image
+        image_convert = cv.CreateImage(cv.GetSize(image), image.depth, 3)
+        cv.CvtColor(image, image_convert, cv.CV_GRAY2BGR)
+        image = image_convert
+    # At this point we assume that the CV image is in BGR format
     if isinstance(mode, str):  # TO PIL
         image = Image.fromstring("RGB", cv.GetSize(image),
                                 _convert_cv_bgr(image, 'rgb',
@@ -179,15 +187,30 @@ def convert_image(image, modes):
     Raises:
         ValueError: There was a problem converting the color.
     """
+    if isinstance(image, cv.cvmat):
+        image = cv.GetImage(image)
+    if Image.isImageType(image) and image.mode == 'LA':
+        image = image.convert('L')
+    if Image.isImageType(image) and image.mode not in ('L', 'RGB'):
+        image = image.convert('RGB')
     if Image.isImageType(image) and (image.mode == 'L' or image.mode == 'RGB'):
         if image.mode not in modes:
             image = _convert_pil(image, modes[0])
     elif isinstance(image, cv.iplimage) and (image.channels == 1 or image.channels == 3) and image.depth == cv.IPL_DEPTH_8U:
-        mode = 'rgb' if image.channels == 3 else 'gray'
+        mode = 'bgr' if image.channels == 3 else 'gray'
         if ('opencv', mode, cv.IPL_DEPTH_8U) not in modes:
             image = _convert_cv(image, modes[0])
+    elif isinstance(image, cv.iplimage) and (image.channels == 1 or image.channels == 3) and image.depth == cv.IPL_DEPTH_32F:
+        mode = 'bgr' if image.channels == 3 else 'gray'
+        if ('opencv', mode, cv.IPL_DEPTH_32F) not in modes:
+            # Convert to 8bit to bgr
+            image = _convert_depth(image, cv.IPL_DEPTH_8U)
+            image = _convert_cv(image, modes[0])
     else:
-        raise ValueError('Unknown image type')
+        if Image.isImageType(image):
+            raise ValueError('Unknown image type PIL Mode[%s]' % image.mode)
+        else:
+            raise ValueError('Unknown image type[%s]' % repr(image))
     return image
 
 
@@ -206,6 +229,10 @@ def compute(feature_module, image, *args, **kw):
     Raises:
         ValueError: There was a problem converting the color.
     """
+    msg = ('imfeat.compute(feat, image) is deprecated, use feat(image) instead.'
+           ' If you wrote the feature, ensure that the baseclass is '
+           'imfeat.BaseFeature and _not_ object.')
+    warnings.warn(msg, DeprecationWarning, stacklevel=2)
     try:
         modes = feature_module.MODES
     except AttributeError:
